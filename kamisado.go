@@ -67,19 +67,19 @@ func (state *state) movePiece(player int, color string, dst coord) {
 
 func (state *state) printBoard() {
 	board := state.board
-	type ColorPair struct {
+	type colorPair struct {
 		fg color.Attribute
 		bg color.Attribute
 	}
-	colors := map[string]ColorPair{
-		"orange": ColorPair{color.FgHiRed, color.BgHiRed},
-		"blue":   ColorPair{color.FgCyan, color.BgCyan},
-		"purple": ColorPair{color.FgBlue, color.BgBlue},
-		"pink":   ColorPair{color.FgHiMagenta, color.BgHiMagenta},
-		"yellow": ColorPair{color.FgHiYellow, color.BgHiYellow},
-		"red":    ColorPair{color.FgRed, color.BgRed},
-		"green":  ColorPair{color.FgGreen, color.BgGreen},
-		"brown":  ColorPair{color.FgHiBlack, color.BgHiBlack},
+	colors := map[string]colorPair{
+		"orange": colorPair{color.FgHiRed, color.BgHiRed},
+		"blue":   colorPair{color.FgCyan, color.BgCyan},
+		"purple": colorPair{color.FgBlue, color.BgBlue},
+		"pink":   colorPair{color.FgHiMagenta, color.BgHiMagenta},
+		"yellow": colorPair{color.FgHiYellow, color.BgHiYellow},
+		"red":    colorPair{color.FgRed, color.BgRed},
+		"green":  colorPair{color.FgGreen, color.BgGreen},
+		"brown":  colorPair{color.FgHiBlack, color.BgHiBlack},
 	}
 	fmt.Println()
 	fmt.Print("    ")
