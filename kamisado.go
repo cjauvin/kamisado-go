@@ -11,11 +11,6 @@ import (
 	"github.com/fatih/color"
 )
 
-type piece struct {
-	player int
-	color  string
-}
-
 var boardColors [8][8]string = [8][8]string{
 	{"orange", "blue", "purple", "pink", "yellow", "red", "green", "brown"}, // player 1 (black, CPU)
 	{"red", "orange", "pink", "green", "blue", "yellow", "brown", "purple"},
@@ -30,6 +25,11 @@ var N int = len(boardColors)
 
 type coord struct {
 	i, j int
+}
+
+type piece struct {
+	player int
+	color  string
 }
 
 type state struct {
