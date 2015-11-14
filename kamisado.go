@@ -11,41 +11,41 @@ import (
 	"github.com/fatih/color"
 )
 
-type Piece struct {
+type piece struct {
 	player int
 	color  string
 }
 
 var boardColors [8][8]string = [8][8]string{
-	{"orange", "blue", "purple", "pink", "yellow", "red", "green", "brown"}, // player 1 (black)
+	{"orange", "blue", "purple", "pink", "yellow", "red", "green", "brown"}, // player 1 (black, CPU)
 	{"red", "orange", "pink", "green", "blue", "yellow", "brown", "purple"},
 	{"green", "pink", "orange", "red", "purple", "brown", "yellow", "blue"},
 	{"pink", "purple", "blue", "orange", "brown", "green", "red", "yellow"},
 	{"yellow", "red", "green", "brown", "orange", "blue", "purple", "pink"},
 	{"blue", "yellow", "brown", "purple", "red", "orange", "pink", "green"},
 	{"purple", "brown", "yellow", "blue", "green", "pink", "orange", "red"},
-	{"brown", "green", "red", "yellow", "pink", "purple", "blue", "orange"}} // player 0 (white)
+	{"brown", "green", "red", "yellow", "pink", "purple", "blue", "orange"}} // player 0 (white, human)
 
 var N int = len(boardColors)
 
-type Board [8][8]*Piece
+type board [8][8]*piece
 
-type Coord struct {
+type coord struct {
 	i, j int
 }
 
-type State struct {
-	board             Board
-	playerPieceCoords [2]map[string]Coord // int -> color -> Coord
+type state struct {
+	board             board
+	playerPieceCoords [2]map[string]coord // int -> color -> coord
 }
 
-func (state *State) Copy() *State {
+func (state *state) copy() *state {
 	// the board grid is getting copied because it's an array,
 	// but the playerPieceCoords structure must be deeply copied
 	newState := *state
-	newState.playerPieceCoords = [2]map[string]Coord{}
+	newState.playerPieceCoords = [2]map[string]coord{}
 	for player := 0; player < 2; player++ {
-		newState.playerPieceCoords[player] = make(map[string]Coord)
+		newState.playerPieceCoords[player] = make(map[string]coord)
 		for color, coord := range state.playerPieceCoords[player] {
 			newState.playerPieceCoords[player][color] = coord
 		}
@@ -53,21 +53,21 @@ func (state *State) Copy() *State {
 	return &newState
 }
 
-func ToCoord(a []string) Coord {
+func toCoord(a []string) coord {
 	i, _ := strconv.Atoi(a[0])
 	j, _ := strconv.Atoi(a[1])
-	return Coord{i, j}
+	return coord{i, j}
 }
 
-func (state *State) MovePiece(player int, color string, dst Coord) {
+func (state *state) movePiece(player int, color string, dst coord) {
 	src := state.playerPieceCoords[player][color]
 	piece := state.board[src.i][src.j]
 	state.board[dst.i][dst.j] = piece
 	state.board[src.i][src.j] = nil
-	state.playerPieceCoords[player][color] = Coord{dst.i, dst.j}
+	state.playerPieceCoords[player][color] = coord{dst.i, dst.j}
 }
 
-func (state *State) PrintBoard() {
+func (state *state) printBoard() {
 	board := state.board
 	type ColorPair struct {
 		fg color.Attribute
@@ -130,14 +130,14 @@ func (state *State) PrintBoard() {
 	fmt.Println()
 }
 
-func (state *State) GetPossibleMoveCoords(player int, color string) []Coord {
-	incrs := [3]Coord{Coord{1, -1}, Coord{1, 0}, Coord{1, 1}}
-	coords := []Coord{}
+func (state *state) getPossibleMoveCoords(player int, color string) []coord {
+	incrs := [3]coord{coord{1, -1}, coord{1, 0}, coord{1, 1}}
+	coords := []coord{}
 	pc := state.playerPieceCoords[player][color]
 	piece := state.board[pc.i][pc.j]
 	m := 1
 	if piece.player == 0 {
-		m = -1 // reverse direction of Coord.i component
+		m = -1 // reverse direction of coord.i component
 	}
 	for n := 0; n < 3; n++ { // cycle through 3 i directions
 		i, j := pc.i, pc.j
@@ -147,21 +147,21 @@ func (state *State) GetPossibleMoveCoords(player int, color string) []Coord {
 			if i < 0 || i > (N-1) || j < 0 || j > (N-1) || state.board[i][j] != nil {
 				break
 			}
-			coords = append(coords, Coord{i, j})
+			coords = append(coords, coord{i, j})
 		}
 	}
 	return coords
 }
 
-func (state *State) FindBestMoveCoord(player int, color string, depth int) Coord {
-	dstCoords := state.GetPossibleMoveCoords(player, color)
-	var bestCoord Coord
+func (state *state) findBestMoveCoord(player int, color string, depth int) coord {
+	dstCoords := state.getPossibleMoveCoords(player, color)
+	var bestCoord coord
 	bestValue := math.Inf(-1)
 	for _, dst := range dstCoords {
-		newState := state.Copy()
-		newState.MovePiece(player, color, dst)
+		newState := state.copy()
+		newState.movePiece(player, color, dst)
 		nextColor := boardColors[dst.i][dst.j]
-		v := negamax(newState, player, player, nextColor, depth)
+		v := -negamax(newState, player, player, nextColor, depth)
 		if v > bestValue {
 			bestCoord = dst
 			bestValue = v
@@ -170,7 +170,7 @@ func (state *State) FindBestMoveCoord(player int, color string, depth int) Coord
 	return bestCoord
 }
 
-func (state *State) IsWinning(player int) bool {
+func (state *state) isWinning(player int) bool {
 	var i int
 	if player == 0 { // if white, check top row
 		i = 0
@@ -187,15 +187,15 @@ func (state *State) IsWinning(player int) bool {
 	return false
 }
 
-func (state *State) Value(player int) float64 {
+func (state *state) value(player int) float64 {
 	opponent := (player + 1) % 2
-	pos := state.GetNumberOfWinInOnePlayerPieces(player)
-	neg := state.GetNumberOfWinInOnePlayerPieces(opponent)
-	neg += state.GetNumberDistinctColorsForNextMove(opponent)
+	pos := state.getNumberOfWinInOnePlayerPieces(player)
+	neg := state.getNumberOfWinInOnePlayerPieces(opponent)
+	neg += state.getNumberDistinctColorsForNextMove(opponent)
 	return float64(pos - neg)
 }
 
-func (state *State) GetNumberOfWinInOnePlayerPieces(player int) int {
+func (state *state) getNumberOfWinInOnePlayerPieces(player int) int {
 	nWinningPieces := 0
 	var winningRow int
 	if player == 0 {
@@ -204,7 +204,7 @@ func (state *State) GetNumberOfWinInOnePlayerPieces(player int) int {
 		winningRow = N - 1
 	}
 	for color, _ := range state.playerPieceCoords[player] {
-		moveCoords := state.GetPossibleMoveCoords(player, color)
+		moveCoords := state.getPossibleMoveCoords(player, color)
 		for _, nextCoord := range moveCoords {
 			if nextCoord.i == winningRow {
 				nWinningPieces++
@@ -215,11 +215,11 @@ func (state *State) GetNumberOfWinInOnePlayerPieces(player int) int {
 	return nWinningPieces
 }
 
-func (state *State) GetNumberDistinctColorsForNextMove(player int) int {
+func (state *state) getNumberDistinctColorsForNextMove(player int) int {
 	colors := make(map[string]bool)
 	n := 0
 	for color, _ := range state.playerPieceCoords[player] {
-		moveCoords := state.GetPossibleMoveCoords(player, color)
+		moveCoords := state.getPossibleMoveCoords(player, color)
 		for _, nextCoord := range moveCoords {
 			nextColor := boardColors[nextCoord.i][nextCoord.j]
 			if _, ok := colors[nextColor]; !ok {
@@ -232,26 +232,26 @@ func (state *State) GetNumberDistinctColorsForNextMove(player int) int {
 	return n
 }
 
-func negamax(state *State, initPlayer int, currPlayer int, color string, depth int) float64 {
+func negamax(state *state, initPlayer int, currPlayer int, color string, depth int) float64 {
 	nextPlayer := (currPlayer + 1) % 2
 	m := float64(1)
 	if currPlayer == initPlayer {
-		m = -1
+		m = float64(-1)
 	}
-	if state.IsWinning(currPlayer) {
+	if state.isWinning(currPlayer) {
 		return m * math.Inf(1)
-	} else if state.IsWinning(nextPlayer) {
+	} else if state.isWinning(nextPlayer) {
 		return m * math.Inf(-1)
 	} else if depth == 0 {
-		return m * state.Value(initPlayer)
+		return m * state.value(initPlayer)
 	}
-	dstCoords := state.GetPossibleMoveCoords(nextPlayer, color)
+	dstCoords := state.getPossibleMoveCoords(nextPlayer, color)
 	bestValue := float64(-1)
 	foundMove := false
 	for _, dst := range dstCoords {
 		nextColor := boardColors[dst.i][dst.j]
-		newState := state.Copy()
-		newState.MovePiece(nextPlayer, nextColor, dst)
+		newState := state.copy()
+		newState.movePiece(nextPlayer, nextColor, dst)
 		v := -negamax(newState, nextPlayer, nextPlayer, nextColor, depth-1)
 		if v > bestValue {
 			bestValue = v
@@ -267,28 +267,48 @@ func negamax(state *State, initPlayer int, currPlayer int, color string, depth i
 	}
 }
 
+func (state *state) isLegalMove(player int, color string, dst coord) bool {
+	dstCoords := state.getPossibleMoveCoords(player, color)
+	for _, dstCoord := range dstCoords {
+		if dst == dstCoord {
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
 
 	depth := 3
 
-	board := Board{}
-	playerPieceCoords := [2]map[string]Coord{}
+	board := board{}
+	playerPieceCoords := [2]map[string]coord{}
 
 	// Note that the 16 Piece objects created here will be the only
 	// ones used throughout the entire program.
 	for player, i := range []int{7, 0} {
-		playerPieceCoords[player] = make(map[string]Coord)
+		playerPieceCoords[player] = make(map[string]coord)
 		for j := 0; j < 8; j++ {
 			color := boardColors[i][j]
-			board[i][j] = &Piece{player, color}
-			playerPieceCoords[player][color] = Coord{i, j}
+			board[i][j] = &piece{player, color}
+			playerPieceCoords[player][color] = coord{i, j}
 		}
 	}
 
-	state := State{board, playerPieceCoords}
+	state := state{board, playerPieceCoords}
+
+	/////////////////////////////////////////////////////
+	// state.MovePiece(0, "brown", coord{5, 0})
+	// state.MovePiece(1, "blue", coord{6, 1})
+	// state.MovePiece(0, "brown", coord{3, 2})
+	// //state.PrintBoard()
+	// //fmt.Println(state.GetPossibleMoveCoords(1, "blue"))
+	// fmt.Println(state.FindBestMoveCoord(1, "blue", depth))
+	// os.Exit(0)
+	/////////////////////////////////////////////////////
 
 	fmt.Println("Welcome to Kamisado! You play White (X)")
-	state.PrintBoard()
+	state.printBoard()
 
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter your move (src/dst coords as 4 numbers): ")
@@ -300,44 +320,56 @@ func main() {
 	r, _ := regexp.Compile(`\d+`)
 	a := r.FindAllString(text, -1)
 
-	var humanSrcCoord, humanDstCoord, cpuDstCoord Coord
+	var humanSrcCoord, humanDstCoord, cpuDstCoord coord
 	var humanSrcColor, cpuSrcColor string
 
-	humanSrcCoord = ToCoord(a[:2])
+	humanSrcCoord = toCoord(a[:2])
 	humanSrcColor = boardColors[humanSrcCoord.i][humanSrcCoord.j]
 
-	humanDstCoord = ToCoord(a[2:])
-	state.MovePiece(0, humanSrcColor, humanDstCoord)
+	humanDstCoord = toCoord(a[2:])
+	state.movePiece(0, humanSrcColor, humanDstCoord)
 
 	for {
 
 		cpuSrcColor = boardColors[humanDstCoord.i][humanDstCoord.j]
-		fmt.Println(cpuSrcColor)
-		cpuDstCoord = state.FindBestMoveCoord(1, cpuSrcColor, depth)
-		state.MovePiece(1, cpuSrcColor, cpuDstCoord)
+		cpuDstCoord = state.findBestMoveCoord(1, cpuSrcColor, depth)
 
-		if state.IsWinning(1) {
+		state.movePiece(1, cpuSrcColor, cpuDstCoord)
+
+		if state.isWinning(1) {
+			state.printBoard()
 			fmt.Println("CPU won")
 			os.Exit(0)
 		}
 
-		state.PrintBoard()
+		state.printBoard()
 
 		humanSrcColor = boardColors[cpuDstCoord.i][cpuDstCoord.j]
 
 		fmt.Println("CPU has played on " + humanSrcColor)
 
-		fmt.Print("Enter your move (dst coords as 2 numbers): ")
-		text, _ = reader.ReadString('\n')
-		if text[0] == 'q' {
-			os.Exit(0)
+		for {
+
+			fmt.Print("Enter your move (dst coords as 2 numbers): ")
+			text, _ = reader.ReadString('\n')
+			if text[0] == 'q' {
+				os.Exit(0)
+			}
+			a = r.FindAllString(text, -1)
+
+			humanDstCoord = toCoord(a)
+
+			if !state.isLegalMove(0, humanSrcColor, humanDstCoord) {
+				fmt.Println("Illegal move!")
+			} else {
+				break
+			}
 		}
-		a = r.FindAllString(text, -1)
 
-		humanDstCoord = ToCoord(a)
-		state.MovePiece(0, humanSrcColor, humanDstCoord)
+		state.movePiece(0, humanSrcColor, humanDstCoord)
 
-		if state.IsWinning(0) {
+		if state.isWinning(0) {
+			state.printBoard()
 			fmt.Println("You won!")
 			os.Exit(0)
 		}
