@@ -277,9 +277,22 @@ func (state *state) isLegalMove(player int, color string, dst coord) bool {
 	return false
 }
 
+func (state *state) isBlocked(player int, color string) bool {
+	return len(state.getPossibleMoveCoords(player, color)) == 0
+}
+
 func main() {
 
-	depth := 3
+	if len(os.Args) != 2 {
+		fmt.Println("usage: kamisado-go <depth>")
+		os.Exit(0)
+	}
+
+	depth, ok := strconv.Atoi(os.Args[1])
+	if ok != nil {
+		fmt.Println("usage: kamisado-go <depth>")
+		os.Exit(0)
+	}
 
 	board := board{}
 	playerPieceCoords := [2]map[string]coord{}
@@ -328,10 +341,11 @@ func main() {
 
 	humanDstCoord = toCoord(a[2:])
 	state.movePiece(0, humanSrcColor, humanDstCoord)
+	cpuSrcColor = boardColors[humanDstCoord.i][humanDstCoord.j]
 
 	for {
+		// --> cpuSrcColor must be defined at this point
 
-		cpuSrcColor = boardColors[humanDstCoord.i][humanDstCoord.j]
 		cpuDstCoord = state.findBestMoveCoord(1, cpuSrcColor, depth)
 
 		state.movePiece(1, cpuSrcColor, cpuDstCoord)
@@ -348,7 +362,19 @@ func main() {
 
 		fmt.Println("CPU has played on " + humanSrcColor)
 
+		// Replay right away is human is blocked
+		if state.isBlocked(0, humanSrcColor) {
+			fmt.Println("You are blocked, CPU will play again")
+			// This can be considered as a zero-length move by the human
+			// player, so the CPU src color will be the color of the cell
+			// on which the target human piece is on.
+			humanDstCoord = state.playerPieceCoords[0][humanSrcColor]
+			cpuSrcColor = boardColors[humanDstCoord.i][humanDstCoord.j]
+			continue
+		}
+
 		for {
+			// --> humanSrcColor must be defined at this point
 
 			fmt.Print("Enter your move (dst coords as 2 numbers): ")
 			text, _ = reader.ReadString('\n')
@@ -361,12 +387,24 @@ func main() {
 
 			if !state.isLegalMove(0, humanSrcColor, humanDstCoord) {
 				fmt.Println("Illegal move!")
-			} else {
-				break
+				continue
 			}
-		}
 
-		state.movePiece(0, humanSrcColor, humanDstCoord)
+			state.movePiece(0, humanSrcColor, humanDstCoord)
+			cpuSrcColor = boardColors[humanDstCoord.i][humanDstCoord.j]
+
+			if state.isBlocked(1, cpuSrcColor) {
+				fmt.Println("CPU is blocked, you get to play again")
+				// This can be considered as a zero-length move by the CPU player,
+				// so the human src color will be the color of the cell on which
+				// the target CPU piece is on.
+				cpuDstCoord = state.playerPieceCoords[1][cpuSrcColor]
+				humanSrcColor = boardColors[cpuDstCoord.i][cpuDstCoord.j]
+				continue
+			}
+
+			break // let CPU play
+		}
 
 		if state.isWinning(0) {
 			state.printBoard()
