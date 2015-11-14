@@ -130,7 +130,7 @@ func (state *State) PrintBoard() {
 	fmt.Println()
 }
 
-func (state *State) getPossibleMoveCoords(player int, color string) []Coord {
+func (state *State) GetPossibleMoveCoords(player int, color string) []Coord {
 	incrs := [3]Coord{Coord{1, -1}, Coord{1, 0}, Coord{1, 1}}
 	coords := []Coord{}
 	pc := state.playerPieceCoords[player][color]
@@ -153,8 +153,8 @@ func (state *State) getPossibleMoveCoords(player int, color string) []Coord {
 	return coords
 }
 
-func (state *State) findBestMoveCoord(player int, color string, depth int) Coord {
-	dstCoords := state.getPossibleMoveCoords(player, color)
+func (state *State) FindBestMoveCoord(player int, color string, depth int) Coord {
+	dstCoords := state.GetPossibleMoveCoords(player, color)
 	var bestCoord Coord
 	bestValue := math.Inf(-1)
 	for _, dst := range dstCoords {
@@ -204,7 +204,7 @@ func (state *State) GetNumberOfWinInOnePlayerPieces(player int) int {
 		winningRow = N - 1
 	}
 	for color, _ := range state.playerPieceCoords[player] {
-		moveCoords := state.getPossibleMoveCoords(player, color)
+		moveCoords := state.GetPossibleMoveCoords(player, color)
 		for _, nextCoord := range moveCoords {
 			if nextCoord.i == winningRow {
 				nWinningPieces++
@@ -219,7 +219,7 @@ func (state *State) GetNumberDistinctColorsForNextMove(player int) int {
 	colors := make(map[string]bool)
 	n := 0
 	for color, _ := range state.playerPieceCoords[player] {
-		moveCoords := state.getPossibleMoveCoords(player, color)
+		moveCoords := state.GetPossibleMoveCoords(player, color)
 		for _, nextCoord := range moveCoords {
 			nextColor := boardColors[nextCoord.i][nextCoord.j]
 			if _, ok := colors[nextColor]; !ok {
@@ -245,7 +245,7 @@ func negamax(state *State, initPlayer int, currPlayer int, color string, depth i
 	} else if depth == 0 {
 		return m * state.Value(initPlayer)
 	}
-	dstCoords := state.getPossibleMoveCoords(nextPlayer, color)
+	dstCoords := state.GetPossibleMoveCoords(nextPlayer, color)
 	bestValue := float64(-1)
 	foundMove := false
 	for _, dst := range dstCoords {
@@ -313,7 +313,7 @@ func main() {
 
 		cpuSrcColor = boardColors[humanDstCoord.i][humanDstCoord.j]
 		fmt.Println(cpuSrcColor)
-		cpuDstCoord = state.findBestMoveCoord(1, cpuSrcColor, depth)
+		cpuDstCoord = state.FindBestMoveCoord(1, cpuSrcColor, depth)
 		state.MovePiece(1, cpuSrcColor, cpuDstCoord)
 
 		if state.IsWinning(1) {
