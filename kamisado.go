@@ -133,14 +133,14 @@ func (state *state) printBoard() {
 func (state *state) getPossibleMoveCoords(player int, color string) []coord {
 	incrs := [3]coord{coord{1, -1}, coord{1, 0}, coord{1, 1}}
 	coords := []coord{}
-	pc := state.playerPieceCoords[player][color]
-	piece := state.board[pc.i][pc.j]
+	src := state.playerPieceCoords[player][color]
+	piece := state.board[src.i][src.j]
 	m := 1
 	if piece.player == 0 {
 		m = -1 // reverse direction of coord.i component
 	}
 	for n := 0; n < 3; n++ { // cycle through 3 i directions
-		i, j := pc.i, pc.j
+		i, j := src.i, src.j
 		for {
 			i += incrs[n].i * m
 			j += incrs[n].j
