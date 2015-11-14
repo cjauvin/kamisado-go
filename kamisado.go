@@ -28,14 +28,12 @@ var boardColors [8][8]string = [8][8]string{
 
 var N int = len(boardColors)
 
-type board [8][8]*piece
-
 type coord struct {
 	i, j int
 }
 
 type state struct {
-	board             board
+	board             [8][8]*piece
 	playerPieceCoords [2]map[string]coord // int -> color -> coord
 }
 
@@ -294,7 +292,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	board := board{}
+	board := [8][8]*piece{}
 	playerPieceCoords := [2]map[string]coord{}
 
 	// Note that the 16 Piece objects created here will be the only
