@@ -1,14 +1,14 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
+	"errors"
 	"math"
-	"os"
-	"regexp"
 	"strconv"
+)
 
-	"github.com/fatih/color"
+const (
+	humanPlayer = 0
+	cpuPlayer   = 1
 )
 
 var boardColors [8][8]string = [8][8]string{
@@ -28,8 +28,9 @@ type coord struct {
 }
 
 type piece struct {
-	player int
-	color  string
+	// fields must be capitalized to be JSON exportable
+	Player int    `json:"player"`
+	Color  string `json:"color"`
 }
 
 type state struct {
@@ -51,10 +52,19 @@ func (state *state) copy() *state {
 	return &newState
 }
 
-func toCoord(a []string) coord {
-	i, _ := strconv.Atoi(a[0])
-	j, _ := strconv.Atoi(a[1])
-	return coord{i, j}
+// "a1" -> Coord{7, 0}
+// "d5" -> Coord{3, 3}
+func toCoord(a []string) (coord, error) {
+	if len(a) != 2 {
+		return coord{}, errors.New(`Coord slice must have two elements`)
+	}
+	j := int(a[0][0]) - 97 // 'a' -> 0, 'h' -> 7
+	i, _ := strconv.Atoi(a[1])
+	i = N - i
+	if i < 0 || j < 0 || i >= N || j >= N {
+		return coord{}, errors.New(`Bad coord`)
+	}
+	return coord{i, j}, nil
 }
 
 func (state *state) movePiece(player int, color string, dst coord) {
@@ -65,76 +75,13 @@ func (state *state) movePiece(player int, color string, dst coord) {
 	state.playerPieceCoords[player][color] = coord{dst.i, dst.j}
 }
 
-func (state *state) printBoard() {
-	board := state.board
-	type colorPair struct {
-		fg color.Attribute
-		bg color.Attribute
-	}
-	colors := map[string]colorPair{
-		"orange": colorPair{color.FgHiRed, color.BgHiRed},
-		"blue":   colorPair{color.FgCyan, color.BgCyan},
-		"purple": colorPair{color.FgBlue, color.BgBlue},
-		"pink":   colorPair{color.FgHiMagenta, color.BgHiMagenta},
-		"yellow": colorPair{color.FgHiYellow, color.BgHiYellow},
-		"red":    colorPair{color.FgRed, color.BgRed},
-		"green":  colorPair{color.FgGreen, color.BgGreen},
-		"brown":  colorPair{color.FgHiBlack, color.BgHiBlack},
-	}
-	fmt.Println()
-	fmt.Print("    ")
-	for j := 0; j < N; j++ {
-		fmt.Print(fmt.Sprintf("%d    ", j))
-	}
-	fmt.Println()
-	for i := 0; i < N; i++ {
-		for k := 0; k < 3; k++ {
-			if k == 1 {
-				fmt.Print(fmt.Sprintf(" %d", i))
-			} else {
-				fmt.Print("  ")
-			}
-			for j := 0; j < N; j++ {
-				cp := colors[boardColors[i][j]]
-				color.Set(cp.bg)
-				fmt.Print("  ")
-				piece := board[i][j]
-				if k == 1 && piece != nil {
-					color.Unset()
-					color.Set(colors[piece.color].fg)
-					if piece.player == 0 {
-						fmt.Print("X")
-					} else {
-						fmt.Print("O")
-					}
-				} else {
-					fmt.Print(" ")
-				}
-				color.Set(cp.bg)
-				fmt.Print("  ")
-			}
-			color.Unset()
-			if k == 1 {
-				fmt.Print(i)
-			}
-			fmt.Println()
-		}
-	}
-	fmt.Print("    ")
-	for j := 0; j < N; j++ {
-		fmt.Print(fmt.Sprintf("%d    ", j))
-	}
-	fmt.Println()
-	fmt.Println()
-}
-
 func (state *state) getPossibleMoveCoords(player int, color string) []coord {
 	incrs := [3]coord{coord{1, -1}, coord{1, 0}, coord{1, 1}}
 	coords := []coord{}
 	src := state.playerPieceCoords[player][color]
 	piece := state.board[src.i][src.j]
 	m := 1
-	if piece.player == 0 {
+	if piece.Player == humanPlayer {
 		m = -1 // reverse direction of coord.i component
 	}
 	for n := 0; n < 3; n++ { // cycle through 3 i directions
@@ -170,7 +117,7 @@ func (state *state) findBestMoveCoord(player int, color string, depth int) coord
 
 func (state *state) isWinning(player int) bool {
 	var i int
-	if player == 0 { // if white, check top row
+	if player == humanPlayer { // if white, check top row
 		i = 0
 	} else {
 		i = N - 1 // if black, check bottom row
@@ -178,7 +125,7 @@ func (state *state) isWinning(player int) bool {
 	for j := 0; j < N; j++ {
 		piece := state.board[i][j]
 		// if you find a player's piece in the target row, they won
-		if piece != nil && piece.player == player {
+		if piece != nil && piece.Player == player {
 			return true
 		}
 	}
@@ -196,7 +143,7 @@ func (state *state) value(player int) float64 {
 func (state *state) getNumberOfWinInOnePlayerPieces(player int) int {
 	nWinningPieces := 0
 	var winningRow int
-	if player == 0 {
+	if player == humanPlayer {
 		winningRow = 0
 	} else {
 		winningRow = N - 1
@@ -277,138 +224,4 @@ func (state *state) isLegalMove(player int, color string, dst coord) bool {
 
 func (state *state) isBlocked(player int, color string) bool {
 	return len(state.getPossibleMoveCoords(player, color)) == 0
-}
-
-func main() {
-
-	if len(os.Args) != 2 {
-		fmt.Println("usage: kamisado-go <depth>")
-		os.Exit(0)
-	}
-
-	depth, ok := strconv.Atoi(os.Args[1])
-	if ok != nil {
-		fmt.Println("usage: kamisado-go <depth>")
-		os.Exit(0)
-	}
-
-	board := [8][8]*piece{}
-	playerPieceCoords := [2]map[string]coord{}
-
-	// Note that the 16 Piece objects created here will be the only
-	// ones used throughout the entire program.
-	for player, i := range []int{7, 0} {
-		playerPieceCoords[player] = make(map[string]coord)
-		for j := 0; j < 8; j++ {
-			color := boardColors[i][j]
-			board[i][j] = &piece{player, color}
-			playerPieceCoords[player][color] = coord{i, j}
-		}
-	}
-
-	state := state{board, playerPieceCoords}
-
-	/////////////////////////////////////////////////////
-	// state.MovePiece(0, "brown", coord{5, 0})
-	// state.MovePiece(1, "blue", coord{6, 1})
-	// state.MovePiece(0, "brown", coord{3, 2})
-	// //state.PrintBoard()
-	// //fmt.Println(state.GetPossibleMoveCoords(1, "blue"))
-	// fmt.Println(state.FindBestMoveCoord(1, "blue", depth))
-	// os.Exit(0)
-	/////////////////////////////////////////////////////
-
-	fmt.Println("Welcome to Kamisado! You play White (X)")
-	state.printBoard()
-
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Enter your move (src/dst coords as 4 numbers): ")
-	text, _ := reader.ReadString('\n')
-	if text[0] == 'q' {
-		os.Exit(0)
-	}
-
-	r, _ := regexp.Compile(`\d+`)
-	a := r.FindAllString(text, -1)
-
-	var humanSrcCoord, humanDstCoord, cpuDstCoord coord
-	var humanSrcColor, cpuSrcColor string
-
-	humanSrcCoord = toCoord(a[:2])
-	humanSrcColor = boardColors[humanSrcCoord.i][humanSrcCoord.j]
-
-	humanDstCoord = toCoord(a[2:])
-	state.movePiece(0, humanSrcColor, humanDstCoord)
-	cpuSrcColor = boardColors[humanDstCoord.i][humanDstCoord.j]
-
-	for {
-		// --> cpuSrcColor must be defined at this point
-
-		cpuDstCoord = state.findBestMoveCoord(1, cpuSrcColor, depth)
-
-		state.movePiece(1, cpuSrcColor, cpuDstCoord)
-
-		if state.isWinning(1) {
-			state.printBoard()
-			fmt.Println("CPU won")
-			os.Exit(0)
-		}
-
-		state.printBoard()
-
-		humanSrcColor = boardColors[cpuDstCoord.i][cpuDstCoord.j]
-
-		fmt.Println("CPU has played on " + humanSrcColor)
-
-		// Replay right away is human is blocked
-		if state.isBlocked(0, humanSrcColor) {
-			fmt.Println("You are blocked, CPU will play again")
-			// This can be considered as a zero-length move by the human
-			// player, so the CPU src color will be the color of the cell
-			// on which the target human piece is on.
-			humanDstCoord = state.playerPieceCoords[0][humanSrcColor]
-			cpuSrcColor = boardColors[humanDstCoord.i][humanDstCoord.j]
-			continue
-		}
-
-		for {
-			// --> humanSrcColor must be defined at this point
-
-			fmt.Print("Enter your move (dst coords as 2 numbers): ")
-			text, _ = reader.ReadString('\n')
-			if text[0] == 'q' {
-				os.Exit(0)
-			}
-			a = r.FindAllString(text, -1)
-
-			humanDstCoord = toCoord(a)
-
-			if !state.isLegalMove(0, humanSrcColor, humanDstCoord) {
-				fmt.Println("Illegal move!")
-				continue
-			}
-
-			state.movePiece(0, humanSrcColor, humanDstCoord)
-			cpuSrcColor = boardColors[humanDstCoord.i][humanDstCoord.j]
-
-			if state.isBlocked(1, cpuSrcColor) {
-				fmt.Println("CPU is blocked, you get to play again")
-				// This can be considered as a zero-length move by the CPU player,
-				// so the human src color will be the color of the cell on which
-				// the target CPU piece is on.
-				cpuDstCoord = state.playerPieceCoords[1][cpuSrcColor]
-				humanSrcColor = boardColors[cpuDstCoord.i][cpuDstCoord.j]
-				continue
-			}
-
-			break // let CPU play
-		}
-
-		if state.isWinning(0) {
-			state.printBoard()
-			fmt.Println("You won!")
-			os.Exit(0)
-		}
-	}
-
 }
