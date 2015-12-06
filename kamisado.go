@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"math"
-	"strconv"
 )
 
 const (
@@ -56,13 +55,13 @@ func (state *state) copy() *state {
 // "d5" -> Coord{3, 3}
 func toCoord(a []string) (coord, error) {
 	if len(a) != 2 {
-		return coord{}, errors.New(`Coord slice must have two elements`)
+		return coord{-1, -1}, errors.New(`Coord must have two elements`)
 	}
-	j := int(a[0][0]) - 97 // 'a' -> 0, 'h' -> 7
-	i, _ := strconv.Atoi(a[1])
-	i = N - i
+	// use ascii code conversion
+	j := int(a[0][0]) - 97       // 'a' -> 0, 'h' -> 7
+	i := N - (int(a[1][0]) - 48) // '0' -> 0, '7' -> 7
 	if i < 0 || j < 0 || i >= N || j >= N {
-		return coord{}, errors.New(`Bad coord`)
+		return coord{-1, -1}, errors.New(`Bad coord`)
 	}
 	return coord{i, j}, nil
 }
